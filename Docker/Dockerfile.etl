@@ -1,39 +1,25 @@
-################################################################################
-# Dockerfile para o Serviço de ETL
-# Sistema de Análise de Filmes
-################################################################################
-
 FROM python:3.11-slim
 
-# Metadata
-LABEL maintainer="Sistema de Análise de Filmes"
-LABEL description="Container para execução do pipeline ETL"
-LABEL version="1.0"
-
-# Define o diretório de trabalho
-WORKDIR /app
-
-# Instala dependências do sistema
+# Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
-    gcc \
-    default-libmysqlclient-dev \
-    default-mysql-client \
-    pkg-config \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Copia o arquivo de requirements
-COPY Docker/requirements.txt .
+# Definir diretório de trabalho
+WORKDIR /app
 
-# Instala as dependências Python
+# Copiar requirements
+COPY requirements.txt .
+
+# Instalar dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Cria diretório para os dados
-RUN mkdir -p /app/data/raw/dados_brutos
+# Copiar scripts
+COPY load_silver_data.py .
+COPY wait-for-postgres.sh .
 
-# Script de entrada que aguarda o banco e executa o ETL
-COPY Docker/entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# Dar permissão de execução ao script
+RUN chmod +x wait-for-postgres.sh
 
-# Comando padrão
-ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["python", "/app/job_etl.py"]
+# Comando padrão: aguardar postgres e carregar dados
+CMD ["./wait-for-postgres.sh", "postgres", "python", "load_silver_data.py"]

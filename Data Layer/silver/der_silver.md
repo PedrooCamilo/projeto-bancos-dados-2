@@ -1,266 +1,277 @@
-# 🗺️ DER - Diagrama Entidade-Relacionamento (Camada Silver)
+# DER - CAMADA SILVER (Diagrama Entidade-Relacionamento)
 
-## Descrição
-Este documento apresenta o Diagrama Entidade-Relacionamento (DER) da camada Silver, mostrando graficamente as entidades, seus atributos e os relacionamentos entre elas.
-
----
-
-## 📊 Diagrama Principal
-
-### Notação: Crow's Foot (Pé de Galinha)
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                           MOVIES                            │
-├─────────────────────────────────────────────────────────────┤
-│ 🔑 id                          INT            NOT NULL      │
-│    title                       VARCHAR(500)   NOT NULL      │
-│    overview                    TEXT                         │
-│    release_date                DATE                         │
-│    budget                      BIGINT                       │
-│    revenue                     BIGINT                       │
-│    runtime                     FLOAT                        │
-│    popularity                  FLOAT                        │
-│    status                      VARCHAR(50)                  │
-│    tagline                     TEXT                         │
-│    vote_average                DECIMAL(4,2)                 │
-│    vote_count                  INT                          │
-│    imdb_id                     VARCHAR(20)                  │
-│    original_language           VARCHAR(10)                  │
-│    genres                      TEXT                         │
-│    production_companies        TEXT                         │
-│    production_countries        TEXT                         │
-│    spoken_languages            TEXT                         │
-│    belongs_to_collection       TEXT                         │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              │ 1
-                              │
-                              ├──────────────────────┐
-                              │                      │
-                              │                      │
-                              ○<                     │
-                              │                      │
-                            N │                      │
-                              │                      │
-┌─────────────────────────────────────────────────────────────┐
-│                          RATINGS                            │
-├─────────────────────────────────────────────────────────────┤
-│ 🔑 user_id                 INT            NOT NULL          │
-│ 🔑🔗 movie_id              INT            NOT NULL          │
-│    rating                  DECIMAL(3,1)   NOT NULL          │
-│    rating_timestamp        DATETIME       NOT NULL          │
-└─────────────────────────────────────────────────────────────┘
-```
+**Projeto:** Bancos de Dados 2 - Arquitetura Medallion  
+**Camada:** SILVER (Dados Limpos e Transformados)  
+**Data:** 2025-11-23
 
 ---
 
-## 🎨 Diagrama Detalhado com Cardinalidades
+## 📋 Visão Geral
+
+A camada SILVER implementa uma estrutura **totalmente desnormalizada** com **UMA ÚNICA TABELA** contendo todas as informações de filmes consolidadas.
+
+---
+
+## 📊 Diagrama Conceitual Simplificado
 
 ```
-                    ┌─────────────────┐
-                    │     MOVIES      │
-                    ├─────────────────┤
-                    │ PK: id          │
-                    │                 │
-                    │ title           │
-                    │ overview        │
-                    │ release_date    │
-                    │ budget          │
-                    │ revenue         │
-                    │ ...             │
-                    └────────┬────────┘
-                             │
-                             │ 1
-                             │
-                  ┌──────────┴──────────┐
-                  │                     │
-                  │    RECEBE           │
-                  │    AVALIAÇÃO        │
-                  │                     │
-                  └──────────┬──────────┘
-                             │
-                             │ N (0..*)
-                             │
-                    ┌────────┴────────┐
-                    │    RATINGS      │
-                    ├─────────────────┤
-                    │ PK: user_id     │
-                    │ PK: movie_id    │
-                    │ FK: movie_id ───┘
-                    │                 │
-                    │ rating          │
-                    │ rating_timestamp│
-                    └─────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                                                              │
+│                     SILVER.MOVIES_RAW                        │
+│                  (Tabela Única Desnormalizada)               │
+│                                                              │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  🎬 INFORMAÇÕES BÁSICAS                                      │
+│  • ID (PK)                                                   │
+│  • Título                                                    │
+│  • Título Original                                           │
+│  • Idioma                                                    │
+│                                                              │
+│  📅 DATAS                                                    │
+│  • Data de Lançamento                                        │
+│  • Ano / Mês / Década                                        │
+│                                                              │
+│  💰 MÉTRICAS FINANCEIRAS                                     │
+│  • Orçamento / Receita / Lucro / ROI                         │
+│  • Categorias de Orçamento e Receita                         │
+│                                                              │
+│  ⏱️  DURAÇÃO                                                  │
+│  • Runtime em minutos                                        │
+│  • Categoria de Duração                                      │
+│                                                              │
+│  ⭐ AVALIAÇÕES                                               │
+│  • Média de Votos                                            │
+│  • Contagem de Votos                                         │
+│  • Popularidade                                              │
+│                                                              │
+│  🎭 GÊNEROS E PRODUÇÃO                                       │
+│  • Lista de Gêneros / Gênero Principal                       │
+│  • Lista de Produtoras / Produtora Principal                 │
+│  • Lista de Países / País Principal                          │
+│                                                              │
+│  👤 CRÉDITOS (Elenco e Equipe)                               │
+│  • Diretor                                                   │
+│  • Ator Principal                                            │
+│  • Top Atores                                                │
+│  • Tamanho Elenco / Equipe                                   │
+│                                                              │
+│  🏷️  KEYWORDS                                                │
+│  • Lista de Palavras-chave                                   │
+│  • Contagem de Keywords                                      │
+│                                                              │
+│  📊 ESTATÍSTICAS DE RATINGS                                  │
+│  • Média / Mediana / Desvio Padrão                           │
+│  • Total / Mín / Máx                                         │
+│  • Usuários Únicos                                           │
+│                                                              │
+│  🔗 LINKS ENTRE PLATAFORMAS                                  │
+│  • TMDB ID                                                   │
+│  • IMDB ID / IMDB ID Formatado                               │
+│                                                              │
+│  📝 METADADOS                                                │
+│  • Status / Adult / Overview                                 │
+│  • Tagline / Homepage / Poster Path                          │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+        Total de Colunas: 48
+        Total de Registros: 45.433 filmes
 ```
 
 ---
 
-## 🔍 Cardinalidades Detalhadas
+## 🎯 Características da Estrutura
 
-### Relacionamento: MOVIES ─< RATINGS
+### ✅ Modelo Totalmente Desnormalizado
 
-| Lado         | Entidade | Cardinalidade | Descrição                                    |
-|--------------|----------|---------------|----------------------------------------------|
-| **Um (1)**   | MOVIES   | 1             | Um filme...                                  |
-| **Muitos (N)**| RATINGS  | 0..*          | ...pode ter zero ou muitas avaliações        |
+**Decisão de Design:** Uma única tabela flat (plana) com TODAS as informações
 
-**Interpretação:**
-- Um filme pode existir sem nenhuma avaliação (mínimo 0)
-- Um filme pode ter quantas avaliações forem necessárias (máximo *)
-- Cada avaliação deve estar associada a exatamente um filme (obrigatório)
+**Justificativa:**
+1. **Simplicidade:** Sem JOINs necessários para queries básicas
+2. **Performance de Leitura:** Queries mais rápidas ao evitar JOINs
+3. **Facilidade de ETL:** Processo de transformação simplificado
+4. **Preparação para GOLD:** Fonte única para criar modelo dimensional
 
----
-
-## 📐 Diagrama com Chaves e Constraints
-
-```
-╔═══════════════════════════════════════════════════════════╗
-║                         MOVIES                            ║
-╠═══════════════════════════════════════════════════════════╣
-║ 🔑 id (PK)                    INT                         ║
-║ ───────────────────────────────────────────────────────── ║
-║    title                      VARCHAR(500)    NOT NULL    ║
-║    overview                   TEXT                        ║
-║    release_date               DATE                        ║
-║    budget                     BIGINT         DEFAULT 0    ║
-║    revenue                    BIGINT         DEFAULT 0    ║
-║    runtime                    FLOAT                       ║
-║    popularity                 FLOAT          DEFAULT 0    ║
-║    status                     VARCHAR(50)                 ║
-║    tagline                    TEXT                        ║
-║    vote_average               DECIMAL(4,2)                ║
-║    vote_count                 INT            DEFAULT 0    ║
-║    imdb_id                    VARCHAR(20)                 ║
-║    original_language          VARCHAR(10)                 ║
-║    genres                     TEXT                        ║
-║    production_companies       TEXT                        ║
-║    production_countries       TEXT                        ║
-║    spoken_languages           TEXT                        ║
-║    belongs_to_collection      TEXT                        ║
-╚═══════════════════════════════════════════════════════════╝
-                          │
-                          │
-                          │ FK: movie_id
-                          │ ON DELETE: NO ACTION
-                          │ ON UPDATE: CASCADE
-                          │
-                          ↓
-╔═══════════════════════════════════════════════════════════╗
-║                        RATINGS                            ║
-╠═══════════════════════════════════════════════════════════╣
-║ 🔑 user_id (PK)               INT            NOT NULL     ║
-║ 🔑 movie_id (PK, FK)          INT            NOT NULL     ║
-║ ───────────────────────────────────────────────────────── ║
-║    rating                     DECIMAL(3,1)   NOT NULL     ║
-║    rating_timestamp           DATETIME       NOT NULL     ║
-║                                                           ║
-║ CONSTRAINT: PK_RATINGS (user_id, movie_id)                ║
-║ CONSTRAINT: FK_RATINGS_MOVIES (movie_id → MOVIES.id)      ║
-║ CONSTRAINT: CHK_RATING CHECK (rating >= 0.5 AND <= 5.0)   ║
-╚═══════════════════════════════════════════════════════════╝
-```
+**Desvantagens Aceitáveis:**
+- ❌ Redundância de dados (aceitável em camada SILVER)
+- ❌ Maior espaço de armazenamento (~68 MB total)
+- ❌ Atualizações mais complexas (camada é append-only)
 
 ---
 
-## 🎯 Índices Recomendados
+## 📦 Estrutura da Entidade Única
+
+### **SILVER.MOVIES_RAW**
+
+| Grupo | Quantidade de Colunas | Descrição |
+|-------|----------------------|-----------|
+| Identificadores | 1 | ID único |
+| Informações Básicas | 3 | Títulos e idioma |
+| Datas | 4 | Data completa + derivadas |
+| Métricas Financeiras | 6 | Budget, revenue, profit, ROI + categorias |
+| Duração | 2 | Runtime + categoria |
+| Avaliações | 3 | Vote average/count, popularity |
+| Gêneros | 2 | Lista completa + principal |
+| Produção | 4 | Companies e countries (lista + principal) |
+| Status e Metadados | 7 | Status, adult, textos, URLs |
+| Créditos | 5 | Diretor, atores, tamanhos |
+| Keywords | 2 | Lista + contagem |
+| Estatísticas de Ratings | 7 | Agregações de usuários |
+| Links | 2 | IDs de plataformas |
+| **TOTAL** | **48 colunas** | - |
+
+---
+
+## 🔑 Chave Primária
+
+- **PK:** `id` (INTEGER)
+- **Tipo:** Natural key vinda dos dados originais
+- **Unicidade:** Garantida por constraint PRIMARY KEY
+- **Índice:** Criado automaticamente pelo PostgreSQL
+
+---
+
+## 📊 Índices Adicionais
+
+```sql
+-- Índice por ano (queries temporais frequentes)
+CREATE INDEX idx_movies_raw_year ON silver.movies_raw(release_year);
+
+-- Índice por gênero (análises por categoria)
+CREATE INDEX idx_movies_raw_genre ON silver.movies_raw(primary_genre);
+
+-- Índice por diretor (buscas por talentos)
+CREATE INDEX idx_movies_raw_director ON silver.movies_raw(director);
+```
+
+**Justificativa:**
+- Campos frequentemente usados em `WHERE` e `GROUP BY`
+- Melhora performance de queries analíticas
+- Overhead aceitável dado o volume (~45K registros)
+
+---
+
+## 🔄 Transformações Aplicadas (RAW → SILVER)
+
+### 1️⃣ **Extração de Atributos Derivados**
 
 ```
-📌 MOVIES
-├── PRIMARY KEY INDEX: id
-├── INDEX: release_date (para consultas por período)
-├── INDEX: popularity (para ordenação de filmes populares)
-└── INDEX: vote_average (para consultas de filmes bem avaliados)
+release_date → release_year, release_month, release_decade
+revenue - budget → profit
+(profit / budget) * 100 → roi
+```
 
-📌 RATINGS
-├── PRIMARY KEY INDEX: (user_id, movie_id)
-├── FOREIGN KEY INDEX: movie_id (automático)
-└── INDEX: rating_timestamp (para análises temporais)
+### 2️⃣ **Categorização de Valores Numéricos**
+
+```
+budget → budget_category (Low, Medium, High, Ultra High)
+revenue → revenue_category (Low, Medium, High, Blockbuster)
+runtime → runtime_category (Short, Medium, Long, Very Long)
+```
+
+### 3️⃣ **Extração de Valores Primários**
+
+```
+genres_list (JSON) → primary_genre (primeiro elemento)
+production_companies_list → primary_company
+production_countries_list → primary_country
+```
+
+### 4️⃣ **Consolidação de Créditos**
+
+```
+credits.csv → director, lead_actor, top_actors, cast_size, crew_size
+```
+
+### 5️⃣ **Agregação de Ratings**
+
+```
+ratings.csv → avg_rating, median_rating, std_rating, total_ratings, etc.
+```
+
+### 6️⃣ **Formatação de Links**
+
+```
+links.csv → tmdb_id, imdb_id_formatted (tt + padding)
 ```
 
 ---
 
-## 🔗 Constraints e Regras
+## 📐 Regras de Negócio
 
-### 1. Chaves Primárias
-- **MOVIES.id**: Identifica unicamente cada filme
-- **RATINGS.(user_id, movie_id)**: Identifica unicamente cada avaliação (um usuário pode avaliar cada filme apenas uma vez)
+### RN01: Cálculo de Lucro
+```
+profit = revenue - budget
+```
 
-### 2. Chaves Estrangeiras
-- **RATINGS.movie_id → MOVIES.id**
-  - ON DELETE: NO ACTION (previne exclusão de filmes com avaliações)
-  - ON UPDATE: CASCADE (atualiza movie_id nas avaliações se o id do filme mudar)
+### RN02: Cálculo de ROI
+```
+roi = (profit / budget) × 100
+Se budget = 0, então roi = NULL
+```
 
-### 3. Check Constraints
-- **RATINGS.rating**: Deve estar entre 0.5 e 5.0
-- **MOVIES.budget**: Deve ser >= 0
-- **MOVIES.revenue**: Deve ser >= 0
-- **MOVIES.runtime**: Deve ser > 0
+### RN03: Categorização de Orçamento
+- **Low:** budget < 1M
+- **Medium:** 1M ≤ budget < 10M
+- **High:** 10M ≤ budget < 100M
+- **Ultra High:** budget ≥ 100M
 
-### 4. Unique Constraints
-- **MOVIES.id**: Único
-- **RATINGS.(user_id, movie_id)**: Único (garantido pela PK composta)
+### RN04: Categorização de Receita
+- **Low:** revenue < 10M
+- **Medium:** 10M ≤ revenue < 100M
+- **High:** 100M ≤ revenue < 1B
+- **Blockbuster:** revenue ≥ 1B
+
+### RN05: Extração de Valores Primários
+```
+primary_* = primeiro elemento da lista JSON
+Se lista vazia ou NULL, então primary_* = NULL
+```
 
 ---
 
-## 📊 Legenda de Símbolos
+## 💾 Volumetria
 
-| Símbolo | Significado                          |
-|---------|--------------------------------------|
-| 🔑      | Chave Primária (Primary Key)        |
-| 🔗      | Chave Estrangeira (Foreign Key)     |
-| ─       | Relacionamento                       |
-| │       | Um (1)                               |
-| ○<      | Muitos (N) - opcional                |
-| ●<      | Muitos (N) - obrigatório             |
-| ═       | Linha de separação principal         |
-| ─       | Linha de separação secundária        |
+| Métrica | Valor |
+|---------|-------|
+| **Total de Registros** | 45.433 |
+| **Total de Colunas** | 48 |
+| **Tamanho Estimado** | ~68 MB |
+| **Índices** | 4 (1 PK + 3 secundários) |
+| **Tamanho Total** | ~75 MB (tabela + índices) |
 
 ---
 
-## 📈 Exemplo de Instâncias
+## 🚀 Próximos Passos (SILVER → GOLD)
 
-### Dados de Exemplo
+A tabela `movies_raw` será a **fonte única** para criar o modelo dimensional GOLD:
 
-**MOVIES**
 ```
-┌────┬────────────────────┬──────────────┬──────────┬────────────┐
-│ id │ title              │ release_date │ budget   │ genres     │
-├────┼────────────────────┼──────────────┼──────────┼────────────┤
-│ 1  │ Toy Story          │ 1995-11-22   │ 30000000 │ Animation, │
-│    │                    │              │          │ Comedy     │
-│ 2  │ Jumanji            │ 1995-12-15   │ 65000000 │ Adventure, │
-│    │                    │              │          │ Fantasy    │
-│ 3  │ Grumpier Old Men   │ 1995-12-22   │ 0        │ Romance,   │
-│    │                    │              │          │ Comedy     │
-└────┴────────────────────┴──────────────┴──────────┴────────────┘
+silver.movies_raw (1 tabela flat)
+         ↓
+    ETL Transform
+         ↓
+gold.* (Star Schema: 7 dimensões + 1 fato)
 ```
 
-**RATINGS**
-```
-┌─────────┬──────────┬────────┬─────────────────────┐
-│ user_id │ movie_id │ rating │ rating_timestamp    │
-├─────────┼──────────┼────────┼─────────────────────┤
-│ 1       │ 1        │ 4.0    │ 2023-01-15 14:30:00 │
-│ 1       │ 2        │ 3.5    │ 2023-01-16 10:20:00 │
-│ 2       │ 1        │ 5.0    │ 2023-01-15 16:45:00 │
-│ 3       │ 1        │ 4.5    │ 2023-01-17 20:10:00 │
-│ 3       │ 3        │ 3.0    │ 2023-01-18 11:00:00 │
-└─────────┴──────────┴────────┴─────────────────────┘
-```
-
-**Relacionamentos mostrados:**
-- Filme "Toy Story" (id=1) possui 3 avaliações
-- Usuário 1 avaliou 2 filmes diferentes
-- Cada combinação (user_id, movie_id) é única
+**Transformações Planejadas:**
+1. Quebrar em dimensões (tempo, gênero, companhia, geografia, diretor, ator, filme)
+2. Criar tabela fato com métricas
+3. Estabelecer relacionamentos via surrogate keys
+4. Otimizar para queries OLAP
 
 ---
 
-## 🔄 Evolução e Versionamento
+## 📌 Observações Importantes
 
-**Versão Atual:** 1.0 - Silver Layer
-**Data:** 2024
-**Status:** Produção
+1. **Sem Foreign Keys:** Tabela única, sem relacionamentos
+2. **Sem Constraints de Domínio:** Validações feitas no ETL
+3. **Campos JSON:** Preservados para informação completa
+4. **NULLs Permitidos:** Exceto na PK
+5. **Append-Only:** Não há UPDATEs, apenas INSERTs
+6. **ETL Idempotente:** Pode ser reexecutado (TRUNCATE + INSERT)
 
-**Histórico de Mudanças:**
-- v1.0 (2024): Estrutura inicial com duas entidades principais (MOVIES e RATINGS)
+---
+
+**Conclusão:** A camada SILVER implementa uma estrutura desnormalizada propositalmente para facilitar transformações futuras e otimizar leitura de dados.

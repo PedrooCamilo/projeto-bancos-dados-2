@@ -1,317 +1,209 @@
--- ============================================================================
--- DDL - Data Definition Language (Camada Silver)
--- Sistema de Análise de Filmes
--- Versão: 1.0
--- Data: 2024
--- ============================================================================
+-- ============================================================
+-- DDL - CAMADA SILVER
+-- Projeto: Bancos de Dados 2 - Arquitetura Medallion
+-- Data: 2025-11-23
+-- ============================================================
+-- Descrição: Script de criação da tabela da camada SILVER
+-- A camada SILVER contém UMA ÚNICA TABELA com dados limpos,
+-- transformados e prontos para consumo analítico.
+-- ============================================================
 
--- Configurações iniciais
-SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
-SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
-SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='TRADITIONAL,ALLOW_INVALID_DATES';
+-- ============================================================
+-- 1. CRIAR SCHEMA SILVER
+-- ============================================================
 
--- ============================================================================
--- Criação do Database (se não existir)
--- ============================================================================
+CREATE SCHEMA IF NOT EXISTS silver;
 
-CREATE DATABASE IF NOT EXISTS `movies_db`
-    DEFAULT CHARACTER SET utf8mb4
-    DEFAULT COLLATE utf8mb4_unicode_ci;
+COMMENT ON SCHEMA silver IS 'Camada SILVER - Dados limpos e transformados em uma única tabela desnormalizada';
 
-USE `movies_db`;
+-- ============================================================
+-- 2. TABELA: silver.movies_raw
+-- ============================================================
+-- Descrição: TABELA ÚNICA com TODAS as informações de filmes
+-- Estrutura: Totalmente desnormalizada para facilitar queries
+-- Transformações aplicadas:
+--   - Conversão de tipos de dados
+--   - Categorização de budget, revenue e runtime
+--   - Extração de ano, mês e década
+--   - Cálculo de profit e ROI
+--   - Extração de gênero/companhia/país primários
+--   - Informações de créditos (diretor, atores)
+--   - Estatísticas agregadas de ratings
+--   - Keywords processadas
+--   - Links entre plataformas (IMDB, TMDB)
+-- ============================================================
 
--- ============================================================================
--- Tabela: MOVIES
--- Descrição: Armazena informações detalhadas sobre filmes
--- ============================================================================
-
-DROP TABLE IF EXISTS `movies`;
-
-CREATE TABLE `movies` (
-    -- Chave Primária
-    `id` INT NOT NULL COMMENT 'Identificador único do filme (TMDB ID)',
+CREATE TABLE IF NOT EXISTS silver.movies_raw (
+    -- ========== IDENTIFICADORES ==========
+    id INTEGER PRIMARY KEY,
     
-    -- Informações Básicas
-    `title` VARCHAR(500) NOT NULL COMMENT 'Título do filme',
-    `overview` TEXT DEFAULT NULL COMMENT 'Sinopse/resumo do filme',
-    `release_date` DATE DEFAULT NULL COMMENT 'Data de lançamento do filme',
+    -- ========== INFORMAÇÕES BÁSICAS ==========
+    title VARCHAR(500),
+    original_title VARCHAR(500),
+    original_language VARCHAR(10),
     
-    -- Informações Financeiras
-    `budget` BIGINT DEFAULT 0 COMMENT 'Orçamento de produção em USD',
-    `revenue` BIGINT DEFAULT 0 COMMENT 'Receita de bilheteria em USD',
+    -- ========== DATAS ==========
+    release_date DATE,
+    release_year INTEGER,
+    release_month INTEGER,
+    release_decade INTEGER,
     
-    -- Métricas e Avaliações
-    `runtime` FLOAT DEFAULT NULL COMMENT 'Duração do filme em minutos',
-    `popularity` FLOAT DEFAULT 0.0 COMMENT 'Métrica de popularidade do TMDB',
-    `vote_average` DECIMAL(4, 2) DEFAULT NULL COMMENT 'Nota média (0-10)',
-    `vote_count` INT DEFAULT 0 COMMENT 'Número total de votos',
+    -- ========== MÉTRICAS FINANCEIRAS ==========
+    budget BIGINT,
+    revenue BIGINT,
+    profit BIGINT,
+    roi NUMERIC(15,2),
+    budget_category VARCHAR(50),
+    revenue_category VARCHAR(50),
     
-    -- Status e Metadata
-    `status` VARCHAR(50) DEFAULT NULL COMMENT 'Status do filme (Released, Post Production, etc)',
-    `tagline` TEXT DEFAULT NULL COMMENT 'Slogan/frase de efeito do filme',
+    -- ========== DURAÇÃO ==========
+    runtime NUMERIC(10,2),
+    runtime_category VARCHAR(50),
     
-    -- Identificadores Externos
-    `imdb_id` VARCHAR(20) DEFAULT NULL COMMENT 'ID do filme no IMDb (formato: ttXXXXXXX)',
-    `original_language` VARCHAR(10) DEFAULT NULL COMMENT 'Código ISO 639-1 do idioma original',
+    -- ========== AVALIAÇÕES E POPULARIDADE ==========
+    vote_average NUMERIC(3,1),
+    vote_count INTEGER,
+    popularity NUMERIC(10,3),
     
-    -- Informações Categóricas (Desnormalizadas)
-    `genres` TEXT DEFAULT NULL COMMENT 'Lista de gêneros separados por vírgula',
-    `production_companies` TEXT DEFAULT NULL COMMENT 'Lista de produtoras separadas por vírgula',
-    `production_countries` TEXT DEFAULT NULL COMMENT 'Lista de países produtores separados por vírgula',
-    `spoken_languages` TEXT DEFAULT NULL COMMENT 'Lista de idiomas falados separados por vírgula',
-    `belongs_to_collection` TEXT DEFAULT NULL COMMENT 'Nome da coleção/franquia (se aplicável)',
+    -- ========== GÊNEROS ==========
+    genres_list TEXT,
+    primary_genre VARCHAR(100),
     
-    -- Constraints
-    PRIMARY KEY (`id`),
+    -- ========== PRODUÇÃO ==========
+    production_companies_list TEXT,
+    primary_company VARCHAR(200),
+    production_countries_list TEXT,
+    primary_country VARCHAR(100),
     
-    -- Constraints de validação
-    CONSTRAINT `CHK_BUDGET` CHECK (`budget` >= 0),
-    CONSTRAINT `CHK_REVENUE` CHECK (`revenue` >= 0),
-    CONSTRAINT `CHK_RUNTIME` CHECK (`runtime` IS NULL OR `runtime` >= 0),
-    CONSTRAINT `CHK_VOTE_AVERAGE` CHECK (`vote_average` IS NULL OR (`vote_average` >= 0 AND `vote_average` <= 10))
+    -- ========== STATUS E METADADOS ==========
+    status VARCHAR(50),
+    adult BOOLEAN,
+    overview TEXT,
+    tagline TEXT,
+    homepage TEXT,
+    imdb_id VARCHAR(20),
+    poster_path VARCHAR(200),
     
-) ENGINE=InnoDB 
-  DEFAULT CHARSET=utf8mb4 
-  COLLATE=utf8mb4_unicode_ci
-  COMMENT='Tabela principal de filmes - Camada Silver';
-
--- ============================================================================
--- Índices para a tabela MOVIES
--- ============================================================================
-
-CREATE INDEX `idx_release_date` ON `movies` (`release_date` ASC) 
-    COMMENT 'Índice para consultas por período/ano';
-
-CREATE INDEX `idx_popularity` ON `movies` (`popularity` DESC) 
-    COMMENT 'Índice para ordenação por popularidade';
-
-CREATE INDEX `idx_vote_average` ON `movies` (`vote_average` DESC) 
-    COMMENT 'Índice para consultas de filmes bem avaliados';
-
-CREATE INDEX `idx_title` ON `movies` (`title`(100) ASC) 
-    COMMENT 'Índice prefix para buscas por título';
-
-CREATE INDEX `idx_status` ON `movies` (`status` ASC) 
-    COMMENT 'Índice para filtros por status do filme';
-
--- ============================================================================
--- Tabela: RATINGS
--- Descrição: Armazena avaliações de filmes feitas por usuários
--- ============================================================================
-
-DROP TABLE IF EXISTS `ratings`;
-
-CREATE TABLE `ratings` (
-    -- Chaves Primárias Compostas
-    `user_id` INT NOT NULL COMMENT 'Identificador do usuário que avaliou',
-    `movie_id` INT NOT NULL COMMENT 'Identificador do filme avaliado',
+    -- ========== CRÉDITOS (ELENCO E EQUIPE) ==========
+    director VARCHAR(200),
+    lead_actor VARCHAR(200),
+    top_actors TEXT,
+    cast_size INTEGER,
+    crew_size INTEGER,
     
-    -- Dados da Avaliação
-    `rating` DECIMAL(3, 1) NOT NULL COMMENT 'Nota atribuída (0.5 a 5.0)',
-    `rating_timestamp` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Data e hora da avaliação',
+    -- ========== KEYWORDS ==========
+    keywords_list TEXT,
+    keywords_count INTEGER,
     
-    -- Constraints
-    PRIMARY KEY (`user_id`, `movie_id`),
+    -- ========== ESTATÍSTICAS DE RATINGS ==========
+    avg_rating NUMERIC(3,2),
+    median_rating NUMERIC(3,2),
+    std_rating NUMERIC(3,2),
+    total_ratings INTEGER,
+    min_rating NUMERIC(3,2),
+    max_rating NUMERIC(3,2),
+    unique_users INTEGER,
     
-    -- Chave Estrangeira (FK para tabela movies)
-    CONSTRAINT `FK_RATINGS_MOVIES` 
-        FOREIGN KEY (`movie_id`) 
-        REFERENCES `movies` (`id`)
-        ON DELETE NO ACTION
-        ON UPDATE CASCADE,
-    
-    -- Constraints de validação
-    CONSTRAINT `CHK_RATING_RANGE` CHECK (`rating` >= 0.5 AND `rating` <= 5.0),
-    CONSTRAINT `CHK_RATING_INCREMENT` CHECK ((`rating` * 10) % 5 = 0)
-    
-) ENGINE=InnoDB 
-  DEFAULT CHARSET=utf8mb4 
-  COLLATE=utf8mb4_unicode_ci
-  COMMENT='Tabela de avaliações de usuários - Camada Silver';
+    -- ========== LINKS ENTRE PLATAFORMAS ==========
+    tmdb_id INTEGER,
+    imdb_id_formatted VARCHAR(20)
+);
 
--- ============================================================================
--- Índices para a tabela RATINGS
--- ============================================================================
+-- ============================================================
+-- 3. COMENTÁRIOS
+-- ============================================================
 
-CREATE INDEX `idx_movie_id` ON `ratings` (`movie_id` ASC) 
-    COMMENT 'FK index - otimiza joins com movies';
+COMMENT ON TABLE silver.movies_raw IS 'Tabela única desnormalizada com TODAS as informações de filmes da camada SILVER';
 
-CREATE INDEX `idx_rating_timestamp` ON `ratings` (`rating_timestamp` DESC) 
-    COMMENT 'Índice para análises temporais';
+-- Identificadores
+COMMENT ON COLUMN silver.movies_raw.id IS 'ID único do filme (chave primária)';
 
-CREATE INDEX `idx_rating` ON `ratings` (`rating` DESC) 
-    COMMENT 'Índice para consultas por faixa de nota';
+-- Informações Básicas
+COMMENT ON COLUMN silver.movies_raw.title IS 'Título do filme';
+COMMENT ON COLUMN silver.movies_raw.original_title IS 'Título original do filme';
+COMMENT ON COLUMN silver.movies_raw.original_language IS 'Código ISO do idioma original';
 
--- ============================================================================
--- Views Úteis
--- ============================================================================
+-- Datas
+COMMENT ON COLUMN silver.movies_raw.release_date IS 'Data de lançamento';
+COMMENT ON COLUMN silver.movies_raw.release_year IS 'Ano de lançamento (extraído de release_date)';
+COMMENT ON COLUMN silver.movies_raw.release_month IS 'Mês de lançamento (1-12)';
+COMMENT ON COLUMN silver.movies_raw.release_decade IS 'Década de lançamento (1990, 2000, 2010...)';
 
--- View: Filmes com estatísticas de avaliação
-DROP VIEW IF EXISTS `v_movies_with_stats`;
+-- Métricas Financeiras
+COMMENT ON COLUMN silver.movies_raw.budget IS 'Orçamento em USD';
+COMMENT ON COLUMN silver.movies_raw.revenue IS 'Receita em USD';
+COMMENT ON COLUMN silver.movies_raw.profit IS 'Lucro calculado (revenue - budget)';
+COMMENT ON COLUMN silver.movies_raw.roi IS 'Retorno sobre investimento (%) calculado ((profit/budget)*100)';
+COMMENT ON COLUMN silver.movies_raw.budget_category IS 'Categoria de orçamento (Low, Medium, High, Ultra High)';
+COMMENT ON COLUMN silver.movies_raw.revenue_category IS 'Categoria de receita (Low, Medium, High, Blockbuster)';
 
-CREATE VIEW `v_movies_with_stats` AS
-SELECT 
-    m.id,
-    m.title,
-    m.release_date,
-    m.genres,
-    m.budget,
-    m.revenue,
-    m.popularity,
-    m.vote_average AS tmdb_vote_average,
-    m.vote_count AS tmdb_vote_count,
-    COUNT(r.rating) AS user_ratings_count,
-    AVG(r.rating) AS user_avg_rating,
-    MIN(r.rating) AS user_min_rating,
-    MAX(r.rating) AS user_max_rating,
-    CASE 
-        WHEN m.revenue > 0 AND m.budget > 0 
-        THEN ROUND((m.revenue - m.budget) / m.budget * 100, 2)
-        ELSE NULL 
-    END AS roi_percentage
-FROM movies m
-LEFT JOIN ratings r ON m.id = r.movie_id
-GROUP BY m.id, m.title, m.release_date, m.genres, m.budget, m.revenue, 
-         m.popularity, m.vote_average, m.vote_count;
+-- Duração
+COMMENT ON COLUMN silver.movies_raw.runtime IS 'Duração em minutos';
+COMMENT ON COLUMN silver.movies_raw.runtime_category IS 'Categoria de duração (Short, Medium, Long, Very Long)';
 
--- View: Top filmes por ano
-DROP VIEW IF EXISTS `v_top_movies_by_year`;
+-- Avaliações
+COMMENT ON COLUMN silver.movies_raw.vote_average IS 'Média de votos (0-10)';
+COMMENT ON COLUMN silver.movies_raw.vote_count IS 'Quantidade de votos';
+COMMENT ON COLUMN silver.movies_raw.popularity IS 'Score de popularidade';
 
-CREATE VIEW `v_top_movies_by_year` AS
-SELECT 
-    YEAR(release_date) AS year,
-    id,
-    title,
-    vote_average,
-    popularity,
-    revenue,
-    genres
-FROM movies
-WHERE release_date IS NOT NULL
-ORDER BY YEAR(release_date) DESC, vote_average DESC, popularity DESC;
+-- Gêneros
+COMMENT ON COLUMN silver.movies_raw.genres_list IS 'Lista completa de gêneros (JSON)';
+COMMENT ON COLUMN silver.movies_raw.primary_genre IS 'Gênero principal (primeiro da lista)';
 
--- View: Distribuição de gêneros
-DROP VIEW IF EXISTS `v_genre_distribution`;
+-- Produção
+COMMENT ON COLUMN silver.movies_raw.production_companies_list IS 'Lista de produtoras (JSON)';
+COMMENT ON COLUMN silver.movies_raw.primary_company IS 'Produtora principal (primeira da lista)';
+COMMENT ON COLUMN silver.movies_raw.production_countries_list IS 'Lista de países produtores (JSON)';
+COMMENT ON COLUMN silver.movies_raw.primary_country IS 'País principal (primeiro da lista)';
 
-CREATE VIEW `v_genre_distribution` AS
-SELECT 
-    YEAR(release_date) AS year,
-    genres,
-    COUNT(*) AS movie_count,
-    AVG(vote_average) AS avg_rating,
-    AVG(revenue) AS avg_revenue,
-    AVG(budget) AS avg_budget
-FROM movies
-WHERE genres IS NOT NULL AND genres != ''
-GROUP BY YEAR(release_date), genres
-ORDER BY year DESC, movie_count DESC;
+-- Status e Metadados
+COMMENT ON COLUMN silver.movies_raw.status IS 'Status de lançamento (Released, Rumored, etc)';
+COMMENT ON COLUMN silver.movies_raw.adult IS 'Indicador de conteúdo adulto';
+COMMENT ON COLUMN silver.movies_raw.overview IS 'Sinopse do filme';
+COMMENT ON COLUMN silver.movies_raw.tagline IS 'Slogan do filme';
+COMMENT ON COLUMN silver.movies_raw.homepage IS 'URL do site oficial';
+COMMENT ON COLUMN silver.movies_raw.imdb_id IS 'ID no IMDB';
+COMMENT ON COLUMN silver.movies_raw.poster_path IS 'Caminho do poster';
 
--- ============================================================================
--- Procedures Úteis
--- ============================================================================
+-- Créditos
+COMMENT ON COLUMN silver.movies_raw.director IS 'Nome do diretor principal';
+COMMENT ON COLUMN silver.movies_raw.lead_actor IS 'Nome do ator/atriz principal';
+COMMENT ON COLUMN silver.movies_raw.top_actors IS 'Lista dos top 5 atores (JSON)';
+COMMENT ON COLUMN silver.movies_raw.cast_size IS 'Tamanho do elenco';
+COMMENT ON COLUMN silver.movies_raw.crew_size IS 'Tamanho da equipe de produção';
 
--- Procedure: Limpar tabelas para recarga
-DROP PROCEDURE IF EXISTS `sp_truncate_tables`;
+-- Keywords
+COMMENT ON COLUMN silver.movies_raw.keywords_list IS 'Lista de palavras-chave (JSON)';
+COMMENT ON COLUMN silver.movies_raw.keywords_count IS 'Quantidade de keywords';
 
-DELIMITER $$
+-- Estatísticas de Ratings
+COMMENT ON COLUMN silver.movies_raw.avg_rating IS 'Média das avaliações de usuários (0-5)';
+COMMENT ON COLUMN silver.movies_raw.median_rating IS 'Mediana das avaliações';
+COMMENT ON COLUMN silver.movies_raw.std_rating IS 'Desvio padrão das avaliações';
+COMMENT ON COLUMN silver.movies_raw.total_ratings IS 'Total de avaliações recebidas';
+COMMENT ON COLUMN silver.movies_raw.min_rating IS 'Avaliação mínima recebida';
+COMMENT ON COLUMN silver.movies_raw.max_rating IS 'Avaliação máxima recebida';
+COMMENT ON COLUMN silver.movies_raw.unique_users IS 'Número de usuários únicos que avaliaram';
 
-CREATE PROCEDURE `sp_truncate_tables`()
-BEGIN
-    SET FOREIGN_KEY_CHECKS = 0;
-    TRUNCATE TABLE `ratings`;
-    TRUNCATE TABLE `movies`;
-    SET FOREIGN_KEY_CHECKS = 1;
-    SELECT 'Tabelas limpas com sucesso!' AS message;
-END$$
+-- Links
+COMMENT ON COLUMN silver.movies_raw.tmdb_id IS 'ID no The Movie Database (TMDB)';
+COMMENT ON COLUMN silver.movies_raw.imdb_id_formatted IS 'ID do IMDB formatado com prefixo tt';
 
-DELIMITER ;
+-- ============================================================
+-- 4. ÍNDICES PARA PERFORMANCE
+-- ============================================================
 
--- Procedure: Estatísticas gerais do banco
-DROP PROCEDURE IF EXISTS `sp_database_stats`;
+CREATE INDEX IF NOT EXISTS idx_movies_raw_year ON silver.movies_raw(release_year);
+CREATE INDEX IF NOT EXISTS idx_movies_raw_genre ON silver.movies_raw(primary_genre);
+CREATE INDEX IF NOT EXISTS idx_movies_raw_director ON silver.movies_raw(director);
 
-DELIMITER $$
+-- ============================================================
+-- 5. GRANTS (PERMISSÕES)
+-- ============================================================
 
-CREATE PROCEDURE `sp_database_stats`()
-BEGIN
-    SELECT 
-        'MOVIES' AS table_name,
-        COUNT(*) AS total_records,
-        COUNT(DISTINCT id) AS unique_ids,
-        MIN(release_date) AS earliest_movie,
-        MAX(release_date) AS latest_movie,
-        ROUND(AVG(budget), 2) AS avg_budget,
-        ROUND(AVG(revenue), 2) AS avg_revenue,
-        ROUND(AVG(vote_average), 2) AS avg_rating
-    FROM movies
-    
-    UNION ALL
-    
-    SELECT 
-        'RATINGS' AS table_name,
-        COUNT(*) AS total_records,
-        COUNT(DISTINCT user_id) AS unique_users,
-        MIN(rating_timestamp) AS earliest_rating,
-        MAX(rating_timestamp) AS latest_rating,
-        ROUND(AVG(rating), 2) AS avg_rating,
-        NULL AS avg_revenue,
-        NULL AS avg_rating_tmdb
-    FROM ratings;
-END$$
+GRANT ALL PRIVILEGES ON SCHEMA silver TO postgres;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA silver TO postgres;
 
-DELIMITER ;
-
--- ============================================================================
--- Triggers
--- ============================================================================
-
--- Trigger removido para permitir carga de dados (alguns filmes têm título vazio nos dados brutos)
--- Se necessário reativar após a carga inicial
-/*
-DROP TRIGGER IF EXISTS `trg_movies_before_insert`;
-
-DELIMITER $$
-
-CREATE TRIGGER `trg_movies_before_insert`
-BEFORE INSERT ON `movies`
-FOR EACH ROW
-BEGIN
-    -- Validar que a data não seja futura (opcional)
-    IF NEW.release_date > CURDATE() THEN
-        SET NEW.status = 'Planned';
-    END IF;
-    
-    -- Garantir que valores vazios sejam NULL
-    IF NEW.title = '' THEN
-        SIGNAL SQLSTATE '45000' 
-        SET MESSAGE_TEXT = 'Título não pode ser vazio';
-    END IF;
-END$$
-
-DELIMITER ;
-*/
-
--- ============================================================================
--- Grants e Permissões (exemplo)
--- ============================================================================
-
--- Usuário de aplicação (somente leitura em movies, completo em ratings)
--- CREATE USER IF NOT EXISTS 'app_user'@'%' IDENTIFIED BY 'app_password';
--- GRANT SELECT ON movies_db.movies TO 'app_user'@'%';
--- GRANT SELECT, INSERT, UPDATE ON movies_db.ratings TO 'app_user'@'%';
--- FLUSH PRIVILEGES;
-
--- ============================================================================
--- Restaurar configurações
--- ============================================================================
-
-SET SQL_MODE=@OLD_SQL_MODE;
-SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
-SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
-
--- ============================================================================
--- Mensagem de conclusão
--- ============================================================================
-
-SELECT '✅ DDL executado com sucesso!' AS status,
-       'Tabelas MOVIES e RATINGS criadas' AS message,
-       '3 Views e 2 Procedures adicionadas' AS extras;
+-- ============================================================
+-- FIM DO SCRIPT DDL SILVER
+-- ============================================================

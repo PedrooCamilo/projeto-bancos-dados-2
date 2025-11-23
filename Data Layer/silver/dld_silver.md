@@ -1,278 +1,363 @@
-# 📚 DLD - Dicionário Lógico de Dados (Camada Silver)
+# DLD - CAMADA SILVER (Diagrama Lógico de Dados)
 
-## Descrição Geral
-Este documento apresenta o Dicionário Lógico de Dados (DLD) da camada Silver, especificando detalhadamente cada atributo das tabelas, seus tipos de dados, restrições, valores padrão e regras de negócio aplicáveis.
-
----
-
-## 📋 Tabela: MOVIES
-
-**Descrição:** Armazena informações detalhadas sobre filmes processados e transformados da camada RAW.
-
-**Nome Físico:** `movies`
-
-**Engine:** InnoDB
-
-**Charset:** utf8mb4
-
-**Collation:** utf8mb4_unicode_ci
+**Projeto:** Bancos de Dados 2 - Arquitetura Medallion  
+**Camada:** SILVER (Dados Limpos e Transformados)  
+**Data:** 2025-11-23
 
 ---
 
-### Atributos da Tabela MOVIES
+## 📋 Visão Geral
 
-| # | Nome Lógico | Nome Físico | Tipo de Dado | Tamanho | Nulável | PK | FK | Unique | Default | Descrição | Regras/Observações |
-|---|-------------|-------------|--------------|---------|---------|----|----|--------|---------|-----------|-------------------|
-| 1 | ID do Filme | `id` | INT | - | NÃO | ✅ | ❌ | ✅ | - | Identificador único do filme no sistema | PK. Chave primária da tabela. Corresponde ao ID do TMDB. |
-| 2 | Título | `title` | VARCHAR | 500 | NÃO | ❌ | ❌ | ❌ | - | Título do filme (traduzido ou mais conhecido) | Campo obrigatório. Indexado para buscas. |
-| 3 | Sinopse | `overview` | TEXT | 65535 | SIM | ❌ | ❌ | ❌ | NULL | Resumo/sinopse do enredo do filme | Pode conter até ~65KB de texto. |
-| 4 | Data de Lançamento | `release_date` | DATE | - | SIM | ❌ | ❌ | ❌ | NULL | Data oficial de lançamento do filme | Formato: YYYY-MM-DD. Permite consultas temporais. |
-| 5 | Orçamento | `budget` | BIGINT | - | SIM | ❌ | ❌ | ❌ | 0 | Orçamento de produção em dólares (USD) | Valor 0 pode indicar "não informado". Permite até ~9 quintilhões. |
-| 6 | Receita | `revenue` | BIGINT | - | SIM | ❌ | ❌ | ❌ | 0 | Receita total de bilheteria em dólares (USD) | Valor 0 pode indicar "não informado". |
-| 7 | Duração | `runtime` | FLOAT | - | SIM | ❌ | ❌ | ❌ | NULL | Duração do filme em minutos | Valores decimais permitidos (ex: 95.5 minutos). |
-| 8 | Popularidade | `popularity` | FLOAT | - | SIM | ❌ | ❌ | ❌ | 0.0 | Métrica de popularidade do TMDB | Valor calculado pelo TMDB. Maior = mais popular. |
-| 9 | Status | `status` | VARCHAR | 50 | SIM | ❌ | ❌ | ❌ | NULL | Status atual do filme | Valores comuns: 'Released', 'Post Production', 'Rumored'. |
-| 10 | Slogan | `tagline` | TEXT | 65535 | SIM | ❌ | ❌ | ❌ | NULL | Frase de efeito/slogan do filme | Marketing do filme. |
-| 11 | Nota Média | `vote_average` | DECIMAL | 4,2 | SIM | ❌ | ❌ | ❌ | NULL | Nota média de avaliação (0 a 10) | Precisão de 2 casas decimais. Ex: 7.85 |
-| 12 | Contagem de Votos | `vote_count` | INT | - | SIM | ❌ | ❌ | ❌ | 0 | Número total de votos recebidos | Indica quantidade de avaliações no TMDB. |
-| 13 | ID IMDb | `imdb_id` | VARCHAR | 20 | SIM | ❌ | ❌ | ❌ | NULL | Identificador do filme no IMDb | Formato: 'tt' + números (ex: tt0114709). |
-| 14 | Idioma Original | `original_language` | VARCHAR | 10 | SIM | ❌ | ❌ | ❌ | NULL | Código ISO 639-1 do idioma original | Ex: 'en' (inglês), 'pt' (português), 'es' (espanhol). |
-| 15 | Gêneros | `genres` | TEXT | 65535 | SIM | ❌ | ❌ | ❌ | NULL | Lista de gêneros separados por vírgula | Ex: "Action, Adventure, Sci-Fi". Desnormalizado. |
-| 16 | Companhias de Produção | `production_companies` | TEXT | 65535 | SIM | ❌ | ❌ | ❌ | NULL | Produtoras separadas por vírgula | Ex: "Pixar, Walt Disney Pictures". Desnormalizado. |
-| 17 | Países de Produção | `production_countries` | TEXT | 65535 | SIM | ❌ | ❌ | ❌ | NULL | Países produtores separados por vírgula | Ex: "United States, United Kingdom". Desnormalizado. |
-| 18 | Idiomas Falados | `spoken_languages` | TEXT | 65535 | SIM | ❌ | ❌ | ❌ | NULL | Idiomas do filme separados por vírgula | Ex: "English, French". Desnormalizado. |
-| 19 | Coleção/Franquia | `belongs_to_collection` | TEXT | 65535 | SIM | ❌ | ❌ | ❌ | NULL | Nome da coleção/franquia | Ex: "Star Wars Collection". NULL se não pertence. |
+O Diagrama Lógico de Dados (DLD) da camada SILVER especifica detalhadamente a implementação física da **tabela única desnormalizada** `silver.movies_raw` no PostgreSQL.
 
 ---
 
-### Índices da Tabela MOVIES
+## 📊 Tabela Única: SILVER.MOVIES_RAW
 
-| Nome do Índice | Tipo | Colunas | Descrição |
-|----------------|------|---------|-----------|
-| PRIMARY | PRIMARY KEY | `id` | Chave primária - acesso direto por ID |
-| idx_release_date | INDEX | `release_date` | Otimiza consultas por período/ano |
-| idx_popularity | INDEX | `popularity` | Otimiza ordenação por popularidade |
-| idx_vote_average | INDEX | `vote_average` | Otimiza consultas de filmes bem avaliados |
-| idx_title | INDEX | `title(100)` | Otimiza buscas por título (prefix index) |
+### Estrutura Completa (48 Colunas)
 
----
-
-### Constraints da Tabela MOVIES
-
-| Nome | Tipo | Descrição |
-|------|------|-----------|
-| PK_MOVIES | PRIMARY KEY | `id` deve ser único e não nulo |
-| CHK_BUDGET | CHECK | `budget >= 0` |
-| CHK_REVENUE | CHECK | `revenue >= 0` |
-| CHK_RUNTIME | CHECK | `runtime IS NULL OR runtime > 0` |
-| CHK_VOTE_AVERAGE | CHECK | `vote_average IS NULL OR (vote_average >= 0 AND vote_average <= 10)` |
-
----
-
-## 📊 Tabela: RATINGS
-
-**Descrição:** Armazena as avaliações de filmes realizadas por usuários.
-
-**Nome Físico:** `ratings`
-
-**Engine:** InnoDB
-
-**Charset:** utf8mb4
-
-**Collation:** utf8mb4_unicode_ci
-
----
-
-### Atributos da Tabela RATINGS
-
-| # | Nome Lógico | Nome Físico | Tipo de Dado | Tamanho | Nulável | PK | FK | Unique | Default | Descrição | Regras/Observações |
-|---|-------------|-------------|--------------|---------|---------|----|----|--------|---------|-----------|-------------------|
-| 1 | ID do Usuário | `user_id` | INT | - | NÃO | ✅ | ❌ | ✅* | - | Identificador único do usuário avaliador | Parte da chave primária composta. |
-| 2 | ID do Filme | `movie_id` | INT | - | NÃO | ✅ | ✅ | ✅* | - | Referência ao filme avaliado | Parte da PK composta + FK para MOVIES.id |
-| 3 | Nota | `rating` | DECIMAL | 3,1 | NÃO | ❌ | ❌ | ❌ | - | Nota atribuída ao filme | Escala de 0.5 a 5.0 com incremento de 0.5 |
-| 4 | Data/Hora da Avaliação | `rating_timestamp` | DATETIME | - | NÃO | ❌ | ❌ | ❌ | CURRENT_TIMESTAMP | Momento em que a avaliação foi realizada | Timestamp completo com data e hora |
-
-**Observação:** ✅* indica que a combinação (user_id, movie_id) é única através da PK composta.
-
----
-
-### Índices da Tabela RATINGS
-
-| Nome do Índice | Tipo | Colunas | Descrição |
-|----------------|------|---------|-----------|
-| PRIMARY | PRIMARY KEY | `(user_id, movie_id)` | Garante que um usuário avalie cada filme apenas uma vez |
-| FK_RATINGS_MOVIES | FOREIGN KEY INDEX | `movie_id` | FK para MOVIES - criado automaticamente |
-| idx_rating_timestamp | INDEX | `rating_timestamp` | Otimiza consultas temporais de avaliações |
-| idx_rating | INDEX | `rating` | Otimiza consultas por faixa de nota |
+| # | Coluna | Tipo de Dado | Constraint | Default | Índice | Descrição |
+|---|--------|--------------|------------|---------|--------|-----------|
+| 1 | **id** | `INTEGER` | `PRIMARY KEY` | - | PK | Identificador único |
+| 2 | title | `VARCHAR(500)` | `NULL` | - | - | Título do filme |
+| 3 | original_title | `VARCHAR(500)` | `NULL` | - | - | Título original |
+| 4 | original_language | `VARCHAR(10)` | `NULL` | - | - | Código ISO idioma |
+| 5 | release_date | `DATE` | `NULL` | - | - | Data de lançamento |
+| 6 | release_year | `INTEGER` | `NULL` | - | IDX | Ano (extraído) |
+| 7 | release_month | `INTEGER` | `NULL` | - | - | Mês 1-12 (extraído) |
+| 8 | release_decade | `INTEGER` | `NULL` | - | - | Década (derivado) |
+| 9 | budget | `BIGINT` | `NULL` | - | - | Orçamento em USD |
+| 10 | revenue | `BIGINT` | `NULL` | - | - | Receita em USD |
+| 11 | profit | `BIGINT` | `NULL` | - | - | Lucro (calculado) |
+| 12 | roi | `NUMERIC(15,2)` | `NULL` | - | - | ROI % (calculado) |
+| 13 | budget_category | `VARCHAR(50)` | `NULL` | - | - | Categoria orçamento |
+| 14 | revenue_category | `VARCHAR(50)` | `NULL` | - | - | Categoria receita |
+| 15 | runtime | `NUMERIC(10,2)` | `NULL` | - | - | Duração em minutos |
+| 16 | runtime_category | `VARCHAR(50)` | `NULL` | - | - | Categoria duração |
+| 17 | vote_average | `NUMERIC(3,1)` | `NULL` | - | - | Média votos (0-10) |
+| 18 | vote_count | `INTEGER` | `NULL` | - | - | Quantidade de votos |
+| 19 | popularity | `NUMERIC(10,3)` | `NULL` | - | - | Score popularidade |
+| 20 | genres_list | `TEXT` | `NULL` | - | - | Lista gêneros (JSON) |
+| 21 | primary_genre | `VARCHAR(100)` | `NULL` | - | IDX | Gênero principal |
+| 22 | production_companies_list | `TEXT` | `NULL` | - | - | Lista produtoras (JSON) |
+| 23 | primary_company | `VARCHAR(200)` | `NULL` | - | - | Produtora principal |
+| 24 | production_countries_list | `TEXT` | `NULL` | - | - | Lista países (JSON) |
+| 25 | primary_country | `VARCHAR(100)` | `NULL` | - | - | País principal |
+| 26 | status | `VARCHAR(50)` | `NULL` | - | - | Status lançamento |
+| 27 | adult | `BOOLEAN` | `NULL` | - | - | Conteúdo adulto |
+| 28 | overview | `TEXT` | `NULL` | - | - | Sinopse |
+| 29 | tagline | `TEXT` | `NULL` | - | - | Slogan |
+| 30 | homepage | `TEXT` | `NULL` | - | - | URL site oficial |
+| 31 | imdb_id | `VARCHAR(20)` | `NULL` | - | - | ID IMDB |
+| 32 | poster_path | `VARCHAR(200)` | `NULL` | - | - | Caminho poster |
+| 33 | director | `VARCHAR(200)` | `NULL` | - | IDX | Nome diretor |
+| 34 | lead_actor | `VARCHAR(200)` | `NULL` | - | - | Ator principal |
+| 35 | top_actors | `TEXT` | `NULL` | - | - | Top 5 atores (JSON) |
+| 36 | cast_size | `INTEGER` | `NULL` | - | - | Tamanho elenco |
+| 37 | crew_size | `INTEGER` | `NULL` | - | - | Tamanho equipe |
+| 38 | keywords_list | `TEXT` | `NULL` | - | - | Keywords (JSON) |
+| 39 | keywords_count | `INTEGER` | `NULL` | - | - | Qtd keywords |
+| 40 | avg_rating | `NUMERIC(3,2)` | `NULL` | - | - | Média ratings (0-5) |
+| 41 | median_rating | `NUMERIC(3,2)` | `NULL` | - | - | Mediana ratings |
+| 42 | std_rating | `NUMERIC(3,2)` | `NULL` | - | - | Desvio padrão |
+| 43 | total_ratings | `INTEGER` | `NULL` | - | - | Total avaliações |
+| 44 | min_rating | `NUMERIC(3,2)` | `NULL` | - | - | Menor nota |
+| 45 | max_rating | `NUMERIC(3,2)` | `NULL` | - | - | Maior nota |
+| 46 | unique_users | `INTEGER` | `NULL` | - | - | Usuários únicos |
+| 47 | tmdb_id | `INTEGER` | `NULL` | - | - | ID TMDB |
+| 48 | imdb_id_formatted | `VARCHAR(20)` | `NULL` | - | - | IMDB formatado (tt) |
 
 ---
 
-### Constraints da Tabela RATINGS
+## 🔑 Constraints
 
-| Nome | Tipo | Descrição |
-|------|------|-----------|
-| PK_RATINGS | PRIMARY KEY | Combinação `(user_id, movie_id)` deve ser única |
-| FK_RATINGS_MOVIES | FOREIGN KEY | `movie_id` referencia `MOVIES(id)` |
-| CHK_RATING_RANGE | CHECK | `rating >= 0.5 AND rating <= 5.0` |
-| CHK_RATING_INCREMENT | CHECK | `(rating * 10) % 5 = 0` (múltiplo de 0.5) |
+### Primary Key
+```sql
+CONSTRAINT movies_raw_pkey PRIMARY KEY (id)
+```
 
----
+**Características:**
+- Garante unicidade de cada filme
+- Cria índice B-Tree automaticamente
+- Não permite valores NULL
 
-### Regras de Integridade Referencial - RATINGS
+### Foreign Keys
+**Não há foreign keys** (tabela única, sem relacionamentos)
 
-| FK | Tabela Origem | Coluna Origem | Tabela Destino | Coluna Destino | ON DELETE | ON UPDATE |
-|----|---------------|---------------|----------------|----------------|-----------|-----------|
-| FK_RATINGS_MOVIES | RATINGS | movie_id | MOVIES | id | NO ACTION | CASCADE |
+### Check Constraints
+**Não há check constraints** (validações feitas no ETL)
 
-**Explicação:**
-- **ON DELETE NO ACTION:** Não permite deletar um filme que possui avaliações (preserva histórico)
-- **ON UPDATE CASCADE:** Se o ID do filme for alterado, atualiza automaticamente nas avaliações
-
----
-
-## 🎯 Regras de Negócio Implementadas no DLD
-
-### RN01 - Unicidade de Filmes
-- **Campo:** `MOVIES.id`
-- **Implementação:** PRIMARY KEY
-- **Descrição:** Cada filme deve ter um identificador único no sistema
-
-### RN02 - Avaliação Única por Usuário
-- **Campos:** `RATINGS.(user_id, movie_id)`
-- **Implementação:** PRIMARY KEY composta
-- **Descrição:** Um usuário pode avaliar o mesmo filme apenas uma vez
-
-### RN03 - Integridade Referencial
-- **Campos:** `RATINGS.movie_id → MOVIES.id`
-- **Implementação:** FOREIGN KEY
-- **Descrição:** Toda avaliação deve referenciar um filme existente
-
-### RN04 - Validação de Notas
-- **Campo:** `RATINGS.rating`
-- **Implementação:** CHECK CONSTRAINT
-- **Descrição:** Notas devem estar entre 0.5 e 5.0, com incremento de 0.5
-
-### RN05 - Valores Financeiros Não-Negativos
-- **Campos:** `MOVIES.budget`, `MOVIES.revenue`
-- **Implementação:** CHECK CONSTRAINT
-- **Descrição:** Valores financeiros não podem ser negativos
-
-### RN06 - Registro Temporal Automático
-- **Campo:** `RATINGS.rating_timestamp`
-- **Implementação:** DEFAULT CURRENT_TIMESTAMP
-- **Descrição:** Registra automaticamente o momento da avaliação
-
-### RN07 - Validação de Duração
-- **Campo:** `MOVIES.runtime`
-- **Implementação:** CHECK CONSTRAINT
-- **Descrição:** Se informado, a duração deve ser maior que zero
-
-### RN08 - Validação de Nota Média
-- **Campo:** `MOVIES.vote_average`
-- **Implementação:** CHECK CONSTRAINT
-- **Descrição:** Nota média deve estar entre 0 e 10
+### Unique Constraints
+**Não há unique constraints adicionais** além da PK
 
 ---
 
-## 📊 Domínios e Valores Válidos
+## 📊 Índices
 
-### Status do Filme (`MOVIES.status`)
-Valores típicos (não restritivo):
-- `Released` - Filme lançado
-- `Post Production` - Em pós-produção
-- `Rumored` - Boatos/não confirmado
-- `Planned` - Planejado
-- `In Production` - Em produção
-- `Canceled` - Cancelado
+### Índice Primário (Automático)
+```sql
+CREATE UNIQUE INDEX movies_raw_pkey ON silver.movies_raw USING btree (id)
+```
 
-### Idiomas (`MOVIES.original_language`, `MOVIES.spoken_languages`)
-Formato: Código ISO 639-1 (2 letras)
-- `en` - Inglês
-- `pt` - Português
-- `es` - Espanhol
-- `fr` - Francês
-- `de` - Alemão
-- etc.
+### Índices Secundários
+```sql
+-- Índice por ano de lançamento
+CREATE INDEX idx_movies_raw_year 
+ON silver.movies_raw(release_year);
 
-### Notas de Avaliação (`RATINGS.rating`)
-Valores válidos: {0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0}
+-- Índice por gênero principal
+CREATE INDEX idx_movies_raw_genre 
+ON silver.movies_raw(primary_genre);
 
----
+-- Índice por diretor
+CREATE INDEX idx_movies_raw_director 
+ON silver.movies_raw(director);
+```
 
-## 🔄 Transformações Aplicadas (RAW → SILVER)
-
-### MOVIES
-1. **Limpeza de IDs inválidos:** Removidos registros com ID não-numérico
-2. **Conversão de tipos:** 
-   - `budget`: object → BIGINT
-   - `revenue`: object → BIGINT (já era float64)
-   - `release_date`: object → DATE
-   - `popularity`: object → FLOAT
-3. **Extração de JSON:**
-   - `genres`: JSON array → TEXT concatenado
-   - `production_companies`: JSON array → TEXT concatenado (limitado a 3)
-   - `production_countries`: JSON array → TEXT concatenado
-   - `spoken_languages`: JSON array → TEXT concatenado
-   - `belongs_to_collection`: JSON object → TEXT (nome da coleção)
-4. **Remoção de duplicatas:** Mantida primeira ocorrência
-5. **Tratamento de nulos:** Strings vazias para campos de texto
-
-### RATINGS
-1. **Renomeação de colunas:** 
-   - `userId` → `user_id`
-   - `movieId` → `movie_id`
-   - `timestamp` → `rating_timestamp`
-2. **Conversão de timestamp:** Unix timestamp → DATETIME
-3. **Filtro de integridade:** Mantidas apenas avaliações de filmes existentes em MOVIES
+**Justificativa:**
+- `release_year`: Filtros temporais frequentes
+- `primary_genre`: Análises por categoria
+- `director`: Buscas por talentos
 
 ---
 
-## 📈 Estimativa de Armazenamento
+## 📏 Tipos de Dados - Justificativa
 
-### MOVIES (por registro)
-- Campos numéricos: ~60 bytes
-- Campos de texto variável: ~1-5 KB (depende do conteúdo)
-- **Média estimada:** ~3 KB por filme
-- **Para 45.000 filmes:** ~135 MB
+### Identificadores
+| Tipo | Uso | Motivo |
+|------|-----|--------|
+| `INTEGER` | id | Valores até ~2 bilhões, suficiente |
 
-### RATINGS (por registro)
-- Todos os campos: ~20 bytes
-- **Para 100.000 avaliações:** ~2 MB
+### Textos
+| Tipo | Uso | Motivo |
+|------|-----|--------|
+| `VARCHAR(500)` | Títulos | Tamanho máximo observado ~400 chars |
+| `VARCHAR(200)` | Nomes, companhias | Tamanho típico ~150 chars |
+| `VARCHAR(100)` | Gêneros, países | Raramente > 50 chars |
+| `VARCHAR(50)` | Categorias, status | Valores controlados |
+| `VARCHAR(20)` | IDs IMDB | Formato fixo tt + 7 dígitos |
+| `VARCHAR(10)` | Códigos idioma | ISO 639-1 (2 chars) |
+| `TEXT` | Overview, listas JSON | Tamanho variável |
 
-**Total estimado do banco:** ~150-200 MB (incluindo índices)
+### Numéricos
+| Tipo | Uso | Range | Motivo |
+|------|-----|-------|--------|
+| `BIGINT` | Budget, revenue | ±9 quintilhões | Valores > 2 bilhões existem |
+| `INTEGER` | Contadores | ±2 bilhões | Suficiente para counts |
+| `NUMERIC(15,2)` | ROI | Até 999 trilhões | Valores extremos de ROI |
+| `NUMERIC(10,3)` | Popularity | 3 decimais | Precisão necessária |
+| `NUMERIC(10,2)` | Runtime | Minutos com decimais | Duração precisa |
+| `NUMERIC(3,2)` | Ratings | 0.00-5.00 | Escala 0-5 |
+| `NUMERIC(3,1)` | Vote average | 0.0-10.0 | Escala 0-10 |
+
+### Temporais
+| Tipo | Uso | Motivo |
+|------|-----|--------|
+| `DATE` | release_date | Apenas data, sem hora |
+
+### Booleanos
+| Tipo | Uso | Motivo |
+|------|-----|--------|
+| `BOOLEAN` | adult | Valores TRUE/FALSE |
+
+---
+
+## 💾 Estimativa de Armazenamento
+
+### Por Coluna (Tamanho Médio)
+
+| Grupo de Colunas | Qtd | Bytes/Coluna | Total |
+|------------------|-----|--------------|-------|
+| INTEGER/BIGINT | 10 | 4-8 | ~60 bytes |
+| NUMERIC | 11 | 8-16 | ~120 bytes |
+| VARCHAR curtos | 15 | 20-50 | ~400 bytes |
+| TEXT (listas JSON) | 6 | 100-500 | ~1.800 bytes |
+| DATE | 1 | 4 | 4 bytes |
+| BOOLEAN | 1 | 1 | 1 byte |
+| **TOTAL por linha** | **48** | - | **~2.385 bytes** |
+
+### Total da Tabela
+
+| Componente | Cálculo | Tamanho |
+|------------|---------|---------|
+| Dados (45.433 linhas × 2.385 bytes) | - | ~108 MB |
+| Índices (4 índices) | - | ~15 MB |
+| Overhead PostgreSQL (TOAST, headers) | ~15% | ~18 MB |
+| **TOTAL ESTIMADO** | - | **~141 MB** |
+
+**Nota:** Valores reais podem variar devido a compressão e TOAST (The Oversized-Attribute Storage Technique).
+
+---
+
+## 📐 Normalização
+
+### Forma Normal: **0FN (Não Normalizada)**
+
+**Características:**
+- ❌ **1FN violada:** Campos JSON (genres_list, top_actors, etc.) são multivalorados
+- ❌ **2FN não aplicável:** Não há chaves compostas
+- ❌ **3FN não aplicável:** Dados intencionalmente desnormalizados
+
+**Justificativa:**
+- Camada intermediária de transformação
+- Prioriza simplicidade e performance de leitura
+- Será normalizada na camada GOLD (Star Schema)
+
+---
+
+## 🔄 Regras de Derivação
+
+### Atributos Calculados no ETL
+
+```python
+# Extração de ano/mês/década
+release_year = pd.to_datetime(release_date).year
+release_month = pd.to_datetime(release_date).month
+release_decade = (release_year // 10) * 10
+
+# Cálculos financeiros
+profit = revenue - budget
+roi = (profit / budget) * 100 if budget > 0 else None
+
+# Categorizações
+budget_category = categorize_budget(budget)
+revenue_category = categorize_revenue(revenue)
+runtime_category = categorize_runtime(runtime)
+
+# Extração de valores primários
+primary_genre = json.loads(genres_list)[0] if genres_list else None
+primary_company = json.loads(companies_list)[0] if companies_list else None
+
+# Agregações de ratings
+avg_rating = ratings_df.groupby('movie_id')['rating'].mean()
+median_rating = ratings_df.groupby('movie_id')['rating'].median()
+```
+
+---
+
+## 📊 Volumetria e Performance
+
+### Estatísticas da Tabela
+
+| Métrica | Valor |
+|---------|-------|
+| Total de Registros | 45.433 |
+| Total de Colunas | 48 |
+| Tamanho da Tabela | ~108 MB |
+| Tamanho dos Índices | ~15 MB |
+| Tamanho Total | ~123 MB |
+| Registros por Página (8KB) | ~3-4 |
+| Total de Páginas | ~15.000 |
+
+### Performance de Queries
+
+| Tipo de Query | Tempo Estimado | Otimização |
+|---------------|----------------|------------|
+| SELECT * WHERE id = ? | <1 ms | PK index |
+| SELECT * WHERE release_year = ? | <10 ms | Índice secundário |
+| SELECT * WHERE primary_genre = ? | <10 ms | Índice secundário |
+| SELECT * WHERE director = ? | <10 ms | Índice secundário |
+| SELECT * (full scan) | ~100 ms | - |
+| Agregações (COUNT, AVG) | 50-200 ms | Depende da coluna |
+
+---
+
+## 🗂️ Particionamento
+
+**Não implementado** na SILVER.
+
+**Motivo:**
+- Volume de dados ainda gerenciável (~45K registros)
+- Performance aceitável sem particionamento
+- Complexidade adicional desnecessária
+
+**Consideração Futura:** Se volume ultrapassar 1M registros, particionar por `release_decade`.
 
 ---
 
 ## 🔐 Permissões e Segurança
 
-### Usuários Recomendados
-1. **app_user** (aplicação)
-   - SELECT, INSERT, UPDATE em RATINGS
-   - SELECT em MOVIES
-   
-2. **admin_user** (administração)
-   - ALL PRIVILEGES em ambas as tabelas
-   
-3. **readonly_user** (leitura/análise)
-   - SELECT em ambas as tabelas
+```sql
+-- Grants para usuário postgres
+GRANT ALL PRIVILEGES ON SCHEMA silver TO postgres;
+GRANT ALL PRIVILEGES ON TABLE silver.movies_raw TO postgres;
+
+-- Para outros usuários (exemplo)
+-- GRANT SELECT ON silver.movies_raw TO analytics_user;
+-- GRANT INSERT ON silver.movies_raw TO etl_user;
+```
 
 ---
 
-## 📝 Observações Finais
+## 📝 Comentários no Banco
 
-1. **Desnormalização Intencional:** Os campos de gêneros, companhias e idiomas foram mantidos como TEXT concatenado para simplificar a estrutura inicial. Futura normalização pode criar tabelas auxiliares.
+Todos os comentários estão implementados via `COMMENT ON`:
 
-2. **Performance:** Índices criados para otimizar as consultas mais comuns (por título, data, popularidade).
+```sql
+COMMENT ON TABLE silver.movies_raw IS 'Tabela única desnormalizada...';
+COMMENT ON COLUMN silver.movies_raw.id IS 'Identificador único...';
+-- ... (48 comentários de colunas)
+```
 
-3. **Escalabilidade:** A estrutura atual suporta crescimento para milhões de registros com performance adequada.
-
-4. **Charset UTF-8:** Suporta caracteres especiais e emojis (utf8mb4).
-
-5. **Campos Calculados:** `vote_average` e `vote_count` são mantidos em MOVIES para performance, mesmo que possam ser calculados a partir de RATINGS.
+**Benefício:** Documentação integrada ao schema, visível em ferramentas de administração.
 
 ---
 
-**Versão:** 1.0  
-**Data:** 2024  
-**Autor:** Sistema de Análise de Filmes - Camada Silver  
-**Status:** Produção
+## 🚀 Próximos Passos (SILVER → GOLD)
+
+### Transformações Planejadas
+
+```
+silver.movies_raw
+         ↓
+    ┌────┴────┐
+    ↓         ↓
+gold.dim_*  gold.fto_filme
+```
+
+1. **Quebrar em Dimensões:**
+   - dim_tempo ← release_date
+   - dim_genero ← primary_genre
+   - dim_companhia ← primary_company
+   - dim_geografia ← primary_country
+   - dim_diretor ← director
+   - dim_ator ← lead_actor
+   - dim_filme ← atributos descritivos
+
+2. **Criar Tabela Fato:**
+   - fto_filme ← métricas + FKs
+
+3. **Normalização:**
+   - Modelo dimensional (Star Schema)
+   - Surrogate keys
+   - Relacionamentos FK
+
+---
+
+## 📌 Observações de Implementação
+
+1. **Encoding:** UTF-8 em todo o schema
+2. **Collation:** Padrão PostgreSQL (pt_BR ou C)
+3. **NULLs:** Permitidos em todas as colunas exceto PK
+4. **Defaults:** Nenhum default definido (valores vêm do ETL)
+5. **Triggers:** Nenhum trigger implementado
+6. **Views:** Nenhuma view na SILVER (apenas tabela base)
+7. **Sequences:** Auto-incremento da PK (não usado, IDs vêm dos dados)
+
+---
+
+## ✅ Checklist de Validação
+
+- [x] PK criada e funcional
+- [x] Índices secundários criados
+- [x] Tipos de dados adequados
+- [x] Comentários documentados
+- [x] Permissões configuradas
+- [x] Dados carregados (45.433 registros)
+- [x] Performance de queries aceitável
+- [ ] Backup configurado (pendente)
+- [ ] Monitoramento ativo (pendente)
+
+---
+
+**Status:** ✅ Implementado e operacional com 45.433 registros carregados.

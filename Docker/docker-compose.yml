@@ -1,102 +1,74 @@
-################################################################################
-# Docker Compose - Sistema de Análise de Filmes
-# Versão: 1.0
-# 
-# Este arquivo define a infraestrutura containerizada para o projeto:
-# - Banco de dados MySQL
-# - Serviço de inicialização e ETL
-################################################################################
-
 version: '3.8'
 
 services:
-  # ============================================================================
-  # Serviço: Banco de Dados MySQL
-  # ============================================================================
-  db:
-    image: mysql:8.0
-    container_name: movies_mysql_db
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: movies_postgres
     restart: always
-    
     environment:
-      MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_DATABASE: movies_db
-      MYSQL_USER: app_user
-      MYSQL_PASSWORD: app_password
-      TZ: America/Sao_Paulo
-    
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      POSTGRES_DB: ${POSTGRES_DB:-movies_dw}
+      PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "3306:3306"
-    
+      - "5432:5432"
     volumes:
-      # Persistência dos dados do MySQL
-      - mysql_data:/var/lib/mysql
-      
-      # Scripts de inicialização do banco
-      - ../Data Layer/silver/ddl_silver.sql:/docker-entrypoint-initdb.d/01-ddl_silver.sql:ro
-    
+      - postgres_data:/var/lib/postgresql/data
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
     networks:
       - movies_network
-    
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
-    
-    command: 
-      - --default-authentication-plugin=mysql_native_password
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
 
-  # ============================================================================
-  # Serviço: ETL e Inicialização
-  # ============================================================================
-  etl:
-    build:
-      context: ..
-      dockerfile: Docker/Dockerfile.etl
-    
-    container_name: movies_etl_service
-    
-    depends_on:
-      db:
-        condition: service_healthy
-    
+  # pgAdmin - Interface Web para PostgreSQL
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: movies_pgadmin
+    restart: always
     environment:
-      DB_HOST: db
-      DB_PORT: 3306
-      DB_NAME: movies_db
-      DB_USER: app_user
-      DB_PASSWORD: app_password
-      PYTHONUNBUFFERED: 1
-    
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@movies.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
     volumes:
-      # Monta os dados brutos
-      - ../Data Layer/raw/dados_brutos:/app/data/raw/dados_brutos:ro
-      
-      # Monta o script ETL
-      - ../Data Layer/silver/job_etl.py:/app/job_etl.py:ro
-    
+      - pgadmin_data:/var/lib/pgadmin
     networks:
       - movies_network
-    
-    # O container executa o ETL e depois encerra
+    depends_on:
+      - postgres
+
+  # ETL - Carrega dados SILVER automaticamente
+  etl_loader:
+    build:
+      context: .
+      dockerfile: Dockerfile.etl
+    container_name: movies_etl_loader
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-movies_dw}
+    volumes:
+      - ../Data Layer/silver/dados_processados:/data:ro
+    networks:
+      - movies_network
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: "no"
 
-# ==============================================================================
-# Volumes
-# ==============================================================================
 volumes:
-  mysql_data:
+  postgres_data:
     driver: local
-    name: movies_mysql_data
+  pgadmin_data:
+    driver: local
 
-# ==============================================================================
-# Networks
-# ==============================================================================
 networks:
   movies_network:
     driver: bridge
-    name: movies_network
