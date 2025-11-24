@@ -94,16 +94,12 @@ COMMENT ON COLUMN gold.dim_filme.cat_duracao IS 'Categoria de duração';
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS gold.dim_genero (
     gnr_srk SERIAL PRIMARY KEY,
-    gnr_nome VARCHAR(100) NOT NULL UNIQUE,
-    gnr_descricao TEXT,
-    gnr_categoria VARCHAR(50)
+    gnr_nome VARCHAR(100) NOT NULL UNIQUE
 );
 
 COMMENT ON TABLE gold.dim_genero IS 'Dimensão de gêneros cinematográficos';
 COMMENT ON COLUMN gold.dim_genero.gnr_srk IS 'Chave substituta (surrogate key) da dimensão gênero';
 COMMENT ON COLUMN gold.dim_genero.gnr_nome IS 'Nome do gênero (Drama, Action, Comedy, etc)';
-COMMENT ON COLUMN gold.dim_genero.gnr_descricao IS 'Descrição do gênero';
-COMMENT ON COLUMN gold.dim_genero.gnr_categoria IS 'Categoria do gênero';
 
 -- ----------------------------------------------------------------------------
 -- Dimensão: COMPANHIA PRODUTORA
@@ -111,14 +107,12 @@ COMMENT ON COLUMN gold.dim_genero.gnr_categoria IS 'Categoria do gênero';
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS gold.dim_companhia (
     cmp_srk SERIAL PRIMARY KEY,
-    cmp_nome VARCHAR(300) NOT NULL UNIQUE,
-    cmp_tipo VARCHAR(100)
+    cmp_nome VARCHAR(300) NOT NULL UNIQUE
 );
 
 COMMENT ON TABLE gold.dim_companhia IS 'Dimensão de companhias produtoras';
 COMMENT ON COLUMN gold.dim_companhia.cmp_srk IS 'Chave substituta (surrogate key) da dimensão companhia';
 COMMENT ON COLUMN gold.dim_companhia.cmp_nome IS 'Nome da companhia produtora';
-COMMENT ON COLUMN gold.dim_companhia.cmp_tipo IS 'Tipo da companhia (Production, Distribution, etc)';
 
 -- ----------------------------------------------------------------------------
 -- Dimensão: GEOGRAFIA
@@ -126,18 +120,12 @@ COMMENT ON COLUMN gold.dim_companhia.cmp_tipo IS 'Tipo da companhia (Production,
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS gold.dim_geografia (
     geo_srk SERIAL PRIMARY KEY,
-    geo_pais VARCHAR(100) NOT NULL UNIQUE,
-    geo_codigo_iso VARCHAR(3),
-    geo_continente VARCHAR(50),
-    geo_regiao VARCHAR(100)
+    geo_pais VARCHAR(100) NOT NULL UNIQUE
 );
 
 COMMENT ON TABLE gold.dim_geografia IS 'Dimensão geográfica (países de produção)';
 COMMENT ON COLUMN gold.dim_geografia.geo_srk IS 'Chave substituta (surrogate key) da dimensão geografia';
 COMMENT ON COLUMN gold.dim_geografia.geo_pais IS 'Nome do país de produção';
-COMMENT ON COLUMN gold.dim_geografia.geo_codigo_iso IS 'Código ISO do país (ISO 3166-1 alpha-3)';
-COMMENT ON COLUMN gold.dim_geografia.geo_continente IS 'Continente do país';
-COMMENT ON COLUMN gold.dim_geografia.geo_regiao IS 'Região geográfica';
 
 -- ----------------------------------------------------------------------------
 -- Dimensão: DIRETOR
@@ -244,7 +232,6 @@ CREATE INDEX IF NOT EXISTS idx_dim_filme_titulo ON gold.dim_filme(mov_titulo);
 CREATE INDEX IF NOT EXISTS idx_dim_genero_nome ON gold.dim_genero(gnr_nome);
 CREATE INDEX IF NOT EXISTS idx_dim_companhia_nome ON gold.dim_companhia(cmp_nome);
 CREATE INDEX IF NOT EXISTS idx_dim_geografia_pais ON gold.dim_geografia(geo_pais);
-CREATE INDEX IF NOT EXISTS idx_dim_geografia_continente ON gold.dim_geografia(geo_continente);
 CREATE INDEX IF NOT EXISTS idx_dim_diretor_nome ON gold.dim_diretor(dir_nome);
 CREATE INDEX IF NOT EXISTS idx_dim_ator_nome ON gold.dim_ator(act_nome);
 
